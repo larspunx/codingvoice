@@ -1,0 +1,24 @@
+{
+  "name": "coding-voice",
+  "displayName": "Coding Voice",
+  "version": "1.0.0",
+  "description": "Reads the agent's answer out loud when a prompt finishes. Play/pause in the status bar, your own TTS API key, English and Polish.",
+  "author": {
+    "name": "larspunx"
+  },
+  "homepage": "https://github.com/larspunx/codingvoice",
+  "repository": "https://github.com/larspunx/codingvoice",
+  "license": "MIT",
+  "keywords": [
+    "cursor",
+    "tts",
+    "text-to-speech",
+    "voice",
+    "accessibility",
+    "elevenlabs",
+    "polish",
+    "english"
+  ],
+  "logo": "assets/logo.png",
+  "hooks": "hooks/hooks.json"
+}

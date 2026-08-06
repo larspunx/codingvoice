@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "afterAgentResponse": [
+      {
+        "command": "./scripts/capture.sh",
+        "timeout": 5
+      }
+    ],
+    "stop": [
+      {
+        "command": "./scripts/speak.sh",
+        "timeout": 5
+      }
+    ]
+  }
+}

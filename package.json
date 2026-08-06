@@ -1,0 +1,217 @@
+{
+  "name": "coding-voice",
+  "displayName": "Coding Voice",
+  "description": "Reads the agent's answer out loud when a prompt finishes. Play/pause in the status bar, your own TTS API key, multiple languages.",
+  "version": "1.0.0",
+  "publisher": "larspunx",
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/larspunx/codingvoice.git"
+  },
+  "bugs": {
+    "url": "https://github.com/larspunx/codingvoice/issues"
+  },
+  "homepage": "https://github.com/larspunx/codingvoice#readme",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "tts",
+    "text-to-speech",
+    "voice",
+    "accessibility",
+    "cursor"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "codingVoice.playPause",
+        "title": "Coding Voice: Play / pause",
+        "icon": "$(play)"
+      },
+      {
+        "command": "codingVoice.stop",
+        "title": "Coding Voice: Stop speaking",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "codingVoice.toggleEnabled",
+        "title": "Coding Voice: Enable / disable reading aloud",
+        "icon": "$(unmute)"
+      },
+      {
+        "command": "codingVoice.openSettings",
+        "title": "Coding Voice: Settings",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "codingVoice.setVolume",
+        "title": "Coding Voice: Reading volume",
+        "icon": "$(unmute)"
+      },
+      {
+        "command": "codingVoice.setApiKey",
+        "title": "Coding Voice: Set TTS API key"
+      }
+    ],
+    "configuration": {
+      "title": "Coding Voice",
+      "properties": {
+        "codingVoice.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Read the agent's answer out loud when a turn finishes."
+        },
+        "codingVoice.engine": {
+          "type": "string",
+          "enum": [
+            "system",
+            "elevenlabs"
+          ],
+          "enumDescriptions": [
+            "Built-in system voice — free, offline, no API key.",
+            "ElevenLabs — natural voices, requires your own API key."
+          ],
+          "default": "system",
+          "description": "Speech engine. Cloud engines bill your own account directly."
+        },
+        "codingVoice.scope": {
+          "type": "string",
+          "enum": [
+            "full",
+            "essentials",
+            "ending"
+          ],
+          "enumDescriptions": [
+            "Read the whole answer.",
+            "Read only what matters — headings, highlighted sentences, the first sentence of each paragraph and the closing thought.",
+            "Read only the closing part of the answer — the conclusion and what to do next."
+          ],
+          "default": "full",
+          "description": "How much of the answer to read."
+        },
+        "codingVoice.voice": {
+          "type": "string",
+          "enum": [
+            "female",
+            "male"
+          ],
+          "default": "female",
+          "description": "Narrator voice."
+        },
+        "codingVoice.elevenLabsVoiceId": {
+          "type": "string",
+          "default": "",
+          "description": "Optional ElevenLabs voice ID. Leave empty to use a built-in female/male voice. Paste an ID from your ElevenLabs Voice Library to override both."
+        },
+        "codingVoice.elevenLabsStability": {
+          "type": "number",
+          "default": 0.5,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "ElevenLabs voice stability. Lower is more expressive and variable, higher is calmer and more consistent."
+        },
+        "codingVoice.elevenLabsSimilarity": {
+          "type": "number",
+          "default": 0.75,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "ElevenLabs similarity boost — how closely the output sticks to the original voice."
+        },
+        "codingVoice.elevenLabsStyle": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "ElevenLabs style exaggeration. Higher is more stylised but slower; 0 is neutral."
+        },
+        "codingVoice.elevenLabsSpeakerBoost": {
+          "type": "boolean",
+          "default": true,
+          "description": "ElevenLabs speaker boost — strengthens resemblance to the chosen voice."
+        },
+        "codingVoice.language": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "en",
+            "pl"
+          ],
+          "default": "auto",
+          "description": "Spoken language. 'auto' detects it from the answer."
+        },
+        "codingVoice.rate": {
+          "type": "number",
+          "default": 1,
+          "minimum": 0.5,
+          "maximum": 2,
+          "description": "Speech rate, 1 = normal."
+        },
+        "codingVoice.volume": {
+          "type": "number",
+          "default": 100,
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Reading volume in percent, relative to everything else playing. Affects only this extension's voice — your system volume stays untouched."
+        },
+        "codingVoice.maxCharacters": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "description": "Cut the spoken text after N characters (at a sentence boundary). 0 = read the whole answer. Keeping this low reduces what cloud engines charge you."
+        },
+        "codingVoice.skipCodeBlocks": {
+          "type": "boolean",
+          "default": true,
+          "description": "Drop fenced code blocks and tables — read aloud they are noise."
+        },
+        "codingVoice.announceProject": {
+          "type": "boolean",
+          "default": false,
+          "description": "Start every summary with the project name. Helpful when several Cursor windows read aloud at once — you hear which project a summary belongs to."
+        }
+      }
+    },
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "codingVoicePanel",
+          "title": "Coding Voice",
+          "icon": "$(unmute)"
+        }
+      ]
+    },
+    "views": {
+      "codingVoicePanel": [
+        {
+          "id": "codingVoice.volumeView",
+          "name": "Volume",
+          "type": "webview"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/*/*.test.ts",
+    "package": "npm run typecheck && npm run build && npx @vscode/vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.24.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
