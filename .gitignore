@@ -1,5 +1,6 @@
 node_modules/
 *.vsix
+!coding-voice-1.0.0.vsix
 .DS_Store
 .vscode-test/
 # dist/ is committed so plugin hooks work without a local build step.
