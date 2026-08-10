@@ -1,6 +1,6 @@
 # Coding Voice
 
-![Coding Voice](https://raw.githubusercontent.com/larspunx/codingvoice/main/media/banner.png)
+![Coding Voice](https://raw.githubusercontent.com/larspunx/codingvoice/main/assets/banner.png)
 
 Listen to your agent instead of reading it. When a prompt finishes, Coding Voice reads the answer
 out loud — and gives you play, pause and a volume slider you can grab, in one small bar at the
@@ -10,6 +10,13 @@ Built for the moment you fire off a long task, look away, and want to know what 
 scrolling up.
 
 **Repository:** [github.com/larspunx/codingvoice](https://github.com/larspunx/codingvoice)
+
+**Marketplace assets:**
+
+| Asset | URL |
+| --- | --- |
+| Logo (1:1 PNG) | `https://raw.githubusercontent.com/larspunx/codingvoice/main/assets/logo.png` |
+| Banner (2:1 PNG) | `https://raw.githubusercontent.com/larspunx/codingvoice/main/assets/banner.png` |
 
 ## Architecture
 
