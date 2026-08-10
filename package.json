@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "publisher": "larspunx",
   "license": "MIT",
-  "icon": "media/icon.png",
+  "icon": "assets/logo.png",
   "galleryBanner": {
     "color": "#2d1b69",
     "theme": "dark"

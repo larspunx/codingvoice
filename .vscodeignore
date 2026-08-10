@@ -1,7 +1,6 @@
 .vscode/**
 node_modules/**
 src/**
-design/**
 esbuild.mjs
 tsconfig.json
 **/*.map
