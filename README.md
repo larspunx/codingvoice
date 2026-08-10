@@ -1,6 +1,6 @@
 # Coding Voice
 
-![Coding Voice](https://raw.githubusercontent.com/larspunx/codingvoice/main/assets/banner.png)
+![Coding Voice](assets/banner.png)
 
 Listen to your agent instead of reading it. When a prompt finishes, Coding Voice reads the answer
 out loud — and gives you play, pause and a volume slider you can grab, in one small bar at the
