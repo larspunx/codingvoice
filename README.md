@@ -9,10 +9,11 @@ bottom of the window.
 Built for the moment you fire off a long task, look away, and want to know what came back without
 scrolling up.
 
-## Cursor Plugin + VS Code extension
+**Repository:** [github.com/larspunx/codingvoice](https://github.com/larspunx/codingvoice)
 
-This repository is packaged for [Cursor Marketplace review](https://cursor.com/marketplace/publish)
-following the [Cursor plugin template](https://github.com/cursor/plugin-template):
+## Architecture
+
+This repo ships a **Cursor Plugin** and a **VS Code extension** in one place:
 
 | Piece | Location | Role |
 | --- | --- | --- |
@@ -32,32 +33,29 @@ Both parts are required: hooks move text into a queue; the extension reads it al
 - **System voice (free) or ElevenLabs** with your own API key.
 - **macOS, Windows and Linux.**
 
-## Installation (local test before submit)
+## Installation
 
-### 1. Install the VS Code extension
+### From VSIX (included in repo)
+
+Download [`coding-voice-1.0.0.vsix`](coding-voice-1.0.0.vsix) or build locally:
 
 ```bash
 npm install
 npm run package
 ```
 
-In Cursor: **Extensions → … → Install from VSIX…** → select `coding-voice-1.0.0.vsix`.
+In Cursor: **Extensions → … → Install from VSIX…**
 
-Or load the plugin from a local clone:
+### From source
 
 ```bash
 git clone git@github.com:larspunx/codingvoice.git
-cp -R codingvoice ~/.cursor/plugins/local/coding-voice
+cd codingvoice
+npm install && npm run build
 ```
-
-### 2. Enable hooks
 
 On first activation the extension registers hooks in `~/.cursor/hooks.json`. The plugin also ships
 `hooks/hooks.json` for marketplace discovery — both paths use the same `dist/hook.js` logic.
-
-### 3. Try it
-
-Send a prompt to the agent. When the turn finishes, the answer is read aloud.
 
 ## Settings
 
@@ -92,18 +90,18 @@ left untouched.
 - **Windows:** works out of the box (System.Speech).
 - **Linux:** needs `speech-dispatcher` or `espeak-ng` for the free voice; cloud engines need neither.
 
-## Marketplace submission checklist
+## Releasing a new version
 
-- [x] `.cursor-plugin/plugin.json` manifest with unique kebab-case name (`coding-voice`)
-- [x] Public Git repository (MIT)
-- [x] `README.md` with usage and configuration
-- [x] Logo committed (`assets/logo.png`)
-- [x] Valid hook definitions (`hooks/hooks.json`)
-- [x] Extension source and built artifacts for review
-- [x] Tested locally
+1. Bump `version` in `package.json` and `.cursor-plugin/plugin.json`.
+2. Update `CHANGELOG.md`.
+3. `npm test && npm run package` — produces `coding-voice-X.Y.Z.vsix`.
+4. Commit `dist/`, the new VSIX, and push to `main`.
+5. Submit or notify [Cursor Marketplace](https://cursor.com/marketplace/publish) if required.
+6. Optionally publish to [Open VSX](https://open-vsx.org) for in-app Extensions panel:
 
-Submit for review: [cursor.com/marketplace/publish](https://cursor.com/marketplace/publish) → paste
-`https://github.com/larspunx/codingvoice`.
+```bash
+npx ovsx publish coding-voice-X.Y.Z.vsix -p "$OVSX_PAT"
+```
 
 ## Development
 
