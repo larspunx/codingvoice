@@ -30,6 +30,35 @@ test('markdown inline znika, treść zostaje', () => {
   )
 })
 
+test('goły URL wypada — syntezator nie jęczy na http/slash', () => {
+  assert.equal(
+    toSpeakable('Logo jest tu: https://raw.githubusercontent.com/larspunx/codingvoice/main/assets/logo.png i działa.'),
+    'Logo jest tu: i działa.',
+  )
+  assert.equal(
+    toSpeakable('Zobacz www.example.com/docs/start oraz github.com/larspunx/codingvoice/blob/main/README.md.'),
+    'Zobacz oraz.',
+  )
+})
+
+test('markdown link z etykietą-URL wypada, zwykła etykieta zostaje', () => {
+  assert.equal(
+    toSpeakable('Wejdź na [https://cursor.com/marketplace](https://cursor.com/marketplace) teraz.'),
+    'Wejdź na teraz.',
+  )
+  assert.equal(
+    toSpeakable('Wejdź na [marketplace](https://cursor.com/marketplace) teraz.'),
+    'Wejdź na marketplace teraz.',
+  )
+})
+
+test('mail i autolink wypadają', () => {
+  assert.equal(
+    toSpeakable('Pisz na me@example.com albo <https://example.com/a/b> proszę.'),
+    'Pisz na albo proszę.',
+  )
+})
+
 test('skróty klawiszowe stają się wymawialne', () => {
   assert.equal(toSpeakable('Wciśnij ⌥⌘R teraz.'), 'Wciśnij option command R teraz.')
 })

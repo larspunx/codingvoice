@@ -30,12 +30,55 @@ const SYMBOLS: ReadonlyArray<readonly [string, string]> = [
 const PICTOGRAMS =
   /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}]/gu
 
+/** Goły URL / mail — syntezator próbuje to „wymawiać" (http, dwukropek, slash…) i wychodzi
+ *  jęczenie albo bełkot. Takie rzeczy wypadają z wypowiedzi całkowicie. */
+const BARE_URL =
+  /\b(?:https?|ftp):\/\/[^\s<>\[\]()]+|\bwww\.[^\s<>\[\]()]+/gi
+const AUTO_LINK = /<\s*(?:https?|ftp):\/\/[^>\s]+>/gi
+const MAILTO = /\bmailto:[^\s<>\[\]()]+/gi
+const EMAIL = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g
+/** domena.tld/ścieżka bez schematu — po skróceniu ścieżek zostawał okaleczony fragment do jęczenia */
+const BARE_DOMAIN_PATH =
+  /\b(?:[a-z0-9-]+\.)+(?:com|org|net|io|dev|pl|ai|app|co|edu|gov|uk|de|eu|us|info|me|xyz)\/[^\s<>\[\]()]*/gi
+
 export interface SpeakableOptions {
   /** Ucięcie po N znakach, na granicy zdania. 0 = czytaj całość. Trzyma w ryzach rachunek
    *  za silniki chmurowe, które liczą sobie za znak. */
   maxCharacters?: number
   /** Bloki kodu i tabele. Domyślnie wypadają — na głos to bełkot. */
   skipCodeBlocks?: boolean
+}
+
+function isUrlLike(label: string): boolean {
+  const s = label.trim()
+  if (!s) return true
+  if (/^(?:https?|ftp):\/\//i.test(s) || /^www\./i.test(s) || /^mailto:/i.test(s)) return true
+  return /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(s)
+}
+
+/** Usuwa URL, zostawia ewentualną interpunkcję doklejoną na końcu („zobacz https://x.com."). */
+function dropUrlKeepPunct(match: string): string {
+  const core = match.replace(/[.,;:!?]+$/u, '')
+  const trail = match.slice(core.length)
+  return trail || ' '
+}
+
+/**
+ * Linki i adresy przed skracaniem ścieżek. Inaczej `https://…/foo/bar.png` zostaje obcięte do
+ * `https://…/larspunx/` + `bar.png`, a syntezator wyje na pozostałości URL-a.
+ */
+function stripUnspeakableRefs(text: string): string {
+  let t = text
+  t = t.replace(AUTO_LINK, ' ')
+  // Markdown: sensowna etykieta zostaje, etykieta-URL wypada razem z celem.
+  t = t.replace(/\[([^\]]*)\]\([^)]*\)/g, (_m, label: string) =>
+    isUrlLike(label) ? ' ' : label,
+  )
+  t = t.replace(BARE_URL, dropUrlKeepPunct)
+  t = t.replace(BARE_DOMAIN_PATH, dropUrlKeepPunct)
+  t = t.replace(MAILTO, ' ')
+  t = t.replace(EMAIL, ' ')
+  return t
 }
 
 /**
@@ -81,7 +124,7 @@ export function toSpeakable(markdown: string, options: SpeakableOptions = {}): s
     t = t.replace(/^[ \t]*\|.*\|[ \t]*$/gm, '')
   }
   t = t.replace(/!\[[^\]]*\]\([^)]*\)/g, ' ') // obrazki
-  t = t.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1') // linki → sama etykieta
+  t = stripUnspeakableRefs(t) // URL/maile zanim skrócimy ścieżki — inaczej zostaje jęczący fragment
   t = t.replace(/^[ \t]{0,3}(?:[-*_][ \t]*){3,}$/gm, '') // linie poziome
   t = t.replace(/`([^`]*)`/g, '$1') // inline code bez backticków
   // Nagłówek dostaje kropkę, inaczej zlewa się z pierwszym zdaniem akapitu („Presety Każdy node…").
