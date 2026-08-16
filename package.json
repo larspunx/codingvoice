@@ -2,7 +2,7 @@
   "name": "coding-voice",
   "displayName": "Coding Voice",
   "description": "Reads the agent's answer out loud when a prompt finishes. Play/pause in the status bar, your own TTS API key, multiple languages.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "larspunx",
   "license": "MIT",
   "icon": "assets/logo.png",

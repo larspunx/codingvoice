@@ -4,6 +4,12 @@ All notable changes to Coding Voice are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] — 2026-08-16
+
+Fixed: reading stopped working on Cursor 3.15+, which no longer includes the
+answer text in the `afterAgentResponse` hook payload. The hook now falls back to
+reading the final answer from the conversation transcript.
+
 ## [1.0.0] — 2026-08-06
 
 First public release.

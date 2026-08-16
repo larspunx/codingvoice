@@ -19,6 +19,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { extractResponse } from '../text/extract.js'
+import { lastCursorTurnText } from '../text/transcript.js'
 import {
   ensureStateDir,
   lastPayloadFile,
@@ -56,7 +57,10 @@ function capture(payload: string): void {
   } catch {
     /* jw. */
   }
-  const text = extractResponse(payload)
+  // Cursor 3.15+ przestał wkładać odpowiedź do pola `text` payloadu `afterAgentResponse` —
+  // przychodzi puste, a treść jest już tylko w transkrypcie wskazanym przez `transcript_path`.
+  // Najpierw próbujemy pola z payloadu (starsze Cursory), a gdy pusto — sięgamy do transkryptu.
+  const text = extractResponse(payload) || textFromCursorTranscript(payload)
   if (!text) {
     log('capture: pusta treść — payload zmienił schemat?')
     return
@@ -152,6 +156,23 @@ function fromClaudeCode(payload: string): void {
   }
   // Payload `Stop` Claude Code niesie `cwd` — wystarcza, by przypisać wypowiedź do właściwego okna.
   enqueue(text, workspaceTag(parseWorkspaceRoot(payload)))
+}
+
+/* --------------------------- transkrypt Cursora ---------------------------- */
+
+function textFromCursorTranscript(payload: string): string {
+  let transcript = ''
+  try {
+    transcript = (JSON.parse(payload) as { transcript_path?: string }).transcript_path ?? ''
+  } catch {
+    return ''
+  }
+  if (!transcript || !fs.existsSync(transcript)) return ''
+  try {
+    return lastCursorTurnText(fs.readFileSync(transcript, 'utf8'))
+  } catch {
+    return ''
+  }
 }
 
 /* --------------------------------- kolejka --------------------------------- */
