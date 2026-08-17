@@ -1,6 +1,6 @@
 # Coding Voice
 
-![Coding Voice](https://raw.githubusercontent.com/larspunx/codingvoice/main/assets/banner.png)
+![Coding Voice](https://raw.githubusercontent.com/larspunx/codingvoice/main/assets/banner.gif)
 
 [![Open VSX Version](https://img.shields.io/open-vsx/v/larspunx/coding-voice?color=7c3aed&label=Open%20VSX)](https://open-vsx.org/extension/larspunx/coding-voice)
 [![Open VSX Downloads](https://img.shields.io/open-vsx/dt/larspunx/coding-voice?color=7c3aed&label=downloads)](https://open-vsx.org/extension/larspunx/coding-voice)

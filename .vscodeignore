@@ -8,3 +8,5 @@ tsconfig.json
 .gitignore
 .DS_Store
 *.vsix
+.tmp_*.py
+assets/banner.gif
