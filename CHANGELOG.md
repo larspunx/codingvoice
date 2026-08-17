@@ -4,6 +4,12 @@ All notable changes to Coding Voice are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] — 2026-08-18
+
+Changed: better discoverability on the marketplace — added the `AI` category
+(alongside `Other`) and expanded the search keywords (read aloud, narrator,
+speech, ElevenLabs, audio, agent). No functional changes.
+
 ## [1.1.1] — 2026-08-18
 
 Added: a **Sponsor** button on the marketplace listing and a polished README, so

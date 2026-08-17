@@ -2,7 +2,7 @@
   "name": "coding-voice",
   "displayName": "Coding Voice",
   "description": "Reads the agent's answer out loud when a prompt finishes. Play/pause in the status bar, your own TTS API key, multiple languages.",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "publisher": "larspunx",
   "license": "MIT",
   "icon": "assets/logo.png",
@@ -25,14 +25,22 @@
     "vscode": "^1.85.0"
   },
   "categories": [
+    "AI",
     "Other"
   ],
   "keywords": [
     "tts",
     "text-to-speech",
+    "read aloud",
     "voice",
+    "narrator",
+    "speech",
+    "elevenlabs",
     "accessibility",
-    "cursor"
+    "audio",
+    "cursor",
+    "agent",
+    "ai"
   ],
   "activationEvents": [
     "onStartupFinished"
