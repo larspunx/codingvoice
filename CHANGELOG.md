@@ -4,6 +4,12 @@ All notable changes to Coding Voice are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] — 2026-08-18
+
+Added: a **Sponsor** button on the marketplace listing and a polished README, so
+the optional "buy me a coffee" support is visible before install. The extension
+stays free with every feature unlocked. No functional changes to speech or ducking.
+
 ## [1.1.0] — 2026-08-17
 
 Added: optionally quiet other apps while a summary is read, then restore them to

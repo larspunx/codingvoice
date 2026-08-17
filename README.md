@@ -2,6 +2,11 @@
 
 ![Coding Voice](https://raw.githubusercontent.com/larspunx/codingvoice/main/assets/banner.png)
 
+[![Open VSX Version](https://img.shields.io/open-vsx/v/larspunx/coding-voice?color=7c3aed&label=Open%20VSX)](https://open-vsx.org/extension/larspunx/coding-voice)
+[![Open VSX Downloads](https://img.shields.io/open-vsx/dt/larspunx/coding-voice?color=7c3aed&label=downloads)](https://open-vsx.org/extension/larspunx/coding-voice)
+[![License: MIT](https://img.shields.io/badge/license-MIT-informational)](LICENSE)
+[![Buy me a coffee](https://img.shields.io/badge/Ko--fi-support-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/larspunx)
+
 Listen to your agent instead of reading it. When a prompt finishes, Coding Voice reads the answer
 out loud — and gives you play, pause and a volume slider you can grab, in one small bar at the
 bottom of the window.
@@ -9,14 +14,8 @@ bottom of the window.
 Built for the moment you fire off a long task, look away, and want to know what came back without
 scrolling up.
 
-**Repository:** [github.com/larspunx/codingvoice](https://github.com/larspunx/codingvoice)
-
-**Marketplace assets:**
-
-| Asset | URL |
-| --- | --- |
-| Logo (1:1 PNG) | `https://raw.githubusercontent.com/larspunx/codingvoice/main/assets/logo.png` |
-| Banner (2:1 PNG) | `https://raw.githubusercontent.com/larspunx/codingvoice/main/assets/banner.png` |
+**Free, with every feature unlocked.** No account, no paywall. If it saves you time, you can
+[buy me a coffee](https://ko-fi.com/larspunx) — entirely optional.
 
 ## Architecture
 
@@ -80,6 +79,10 @@ On first activation the extension registers hooks in `~/.cursor/hooks.json`. The
 | `codingVoice.volume` | Reading volume in percent, relative to other apps. |
 | `codingVoice.maxCharacters` | Stop after N characters. `0` reads everything. |
 | `codingVoice.skipCodeBlocks` | Drop fenced code and tables. On by default. |
+| `codingVoice.announceProject` | Prefix each summary with the project name. Handy with several windows open. |
+| `codingVoice.duckSystemAudio` | Quiet other apps while reading, then restore them. Off by default. |
+| `codingVoice.duckLevel` | How much of each app's own volume to keep while reading (percent). |
+| `codingVoice.duckFade` | Fade time for the volume dip, in milliseconds. |
 
 Your API key is stored in the OS keychain, never in `settings.json`.
 
@@ -129,6 +132,12 @@ npm run build      # dist/extension.js + dist/hook.js
 npm test
 npm run package    # coding-voice-<version>.vsix
 ```
+
+## Support
+
+Coding Voice is free and stays free. If it earns a spot in your workflow, a coffee keeps it
+caffeinated: [ko-fi.com/larspunx](https://ko-fi.com/larspunx). There's also a **Buy me a coffee**
+button right in the Coding Voice panel.
 
 ## License
 

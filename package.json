@@ -2,10 +2,13 @@
   "name": "coding-voice",
   "displayName": "Coding Voice",
   "description": "Reads the agent's answer out loud when a prompt finishes. Play/pause in the status bar, your own TTS API key, multiple languages.",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "publisher": "larspunx",
   "license": "MIT",
   "icon": "assets/logo.png",
+  "sponsor": {
+    "url": "https://ko-fi.com/larspunx"
+  },
   "galleryBanner": {
     "color": "#2d1b69",
     "theme": "dark"
