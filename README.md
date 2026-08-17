@@ -1,6 +1,6 @@
 # Coding Voice
 
-![Coding Voice](assets/banner.png)
+![Coding Voice](https://raw.githubusercontent.com/larspunx/codingvoice/main/assets/banner.png)
 
 Listen to your agent instead of reading it. When a prompt finishes, Coding Voice reads the answer
 out loud — and gives you play, pause and a volume slider you can grab, in one small bar at the
@@ -42,13 +42,16 @@ Both parts are required: hooks move text into a queue; the extension reads it al
 
 ## Installation
 
-### From VSIX (included in repo)
+### From the Extensions panel (Open VSX)
 
-Download [`coding-voice-1.0.0.vsix`](coding-voice-1.0.0.vsix) or build locally:
+In Cursor: **Extensions** → search **Coding Voice** → **Install**. Cursor's Extensions
+panel is backed by [Open VSX](https://open-vsx.org).
+
+### Build a VSIX locally
 
 ```bash
 npm install
-npm run package
+npm run package        # produces coding-voice-<version>.vsix
 ```
 
 In Cursor: **Extensions → … → Install from VSIX…**
@@ -99,12 +102,11 @@ left untouched.
 
 ## Releasing a new version
 
-1. Bump `version` in `package.json` and `.cursor-plugin/plugin.json`.
+1. Bump `version` in `package.json` (keep `.cursor-plugin/plugin.json` in sync).
 2. Update `CHANGELOG.md`.
 3. `npm test && npm run package` — produces `coding-voice-X.Y.Z.vsix`.
-4. Commit `dist/`, the new VSIX, and push to `main`.
-5. Submit or notify [Cursor Marketplace](https://cursor.com/marketplace/publish) if required.
-6. Optionally publish to [Open VSX](https://open-vsx.org) for in-app Extensions panel:
+4. Commit `dist/`, push `main`, and tag `vX.Y.Z`.
+5. Publish to [Open VSX](https://open-vsx.org) — Cursor's Extensions panel reads from it:
 
 ```bash
 npx ovsx publish coding-voice-X.Y.Z.vsix -p "$OVSX_PAT"
@@ -116,7 +118,7 @@ npx ovsx publish coding-voice-X.Y.Z.vsix -p "$OVSX_PAT"
 npm install
 npm run build      # dist/extension.js + dist/hook.js
 npm test
-npm run package    # coding-voice-1.0.0.vsix
+npm run package    # coding-voice-<version>.vsix
 ```
 
 ## License
