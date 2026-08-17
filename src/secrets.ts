@@ -29,6 +29,18 @@ export class Secrets {
     }
     // Keychain zwrócił pusto — sięgamy po kopię na dysku i, jeśli jest, przywracamy ją do magazynu,
     // żeby kolejne odczyty (i inne procesy) znów miały ją „u źródła".
+    return this.refreshFromDisk(engine)
+  }
+
+  /**
+   * Ratunek na nieświeży keychain: POMIŃ magazyn, weź kopię z dysku i wlecz nią keychain.
+   *
+   * Woła to `getApiKey`, gdy keychain oddał pusto, oraz silnik po odpowiedzi 401 — bo keychain macOS
+   * tuż po restarcie Cursora potrafi oddać starą albo pustą wartość, przez co pierwsze zapytanie
+   * dostaje 401 mimo poprawnego klucza leżącego na dysku. Zamiast prosić o ponowne wklejenie,
+   * odtwarzamy klucz z kopii i leczymy nim magazyn. Zwraca klucz z dysku albo `undefined`. Nie rzuca.
+   */
+  async refreshFromDisk(engine: EngineId): Promise<string | undefined> {
     try {
       const fromDisk = fs.readFileSync(apiKeyFallbackFile(engine), 'utf8').trim()
       if (fromDisk) {
@@ -41,17 +53,20 @@ export class Secrets {
     return undefined
   }
 
-  /** Zapis kopii tylko gdy różna od tego, co już leży — żeby nie pisać na dysk przy każdym odczycie. */
+  /**
+   * Zapis kopii TYLKO gdy jeszcze jej nie ma.
+   *
+   * Kopia na dysku jest naszą siecią bezpieczeństwa na wypadek pustego keychaina — nie wolno jej
+   * nadpisać wartością z keychaina, bo to właśnie keychain bywa nieświeży po restarcie i mógłby
+   * zamazać dobry klucz starą albo pustą wartością. Świadomą zmianę klucza użytkownika utrwala
+   * `setApiKey`, który pisze na dysk wprost; tu tylko dosypujemy kopię, gdy jej brak.
+   */
   private mirrorToDisk(engine: EngineId, key: string): void {
     const file = apiKeyFallbackFile(engine)
     try {
-      let existing = ''
-      try {
-        existing = fs.readFileSync(file, 'utf8')
-      } catch {
-        /* pliku jeszcze nie ma — zaraz go utworzymy */
+      if (!fs.existsSync(file)) {
+        fs.writeFileSync(file, key, { encoding: 'utf8', mode: 0o600 })
       }
-      if (existing !== key) fs.writeFileSync(file, key, { encoding: 'utf8', mode: 0o600 })
     } catch {
       /* brak kopii to tylko utrata odporności, nie funkcji */
     }

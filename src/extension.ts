@@ -18,6 +18,7 @@ import { Secrets } from './secrets.js'
 import { ensureStateDir, lastSpokenFile } from './shared/paths.js'
 import { workspaceTag } from './shared/workspace.js'
 import { SpeechController } from './speech/controller.js'
+import { Ducker } from './speech/duck.js'
 import { createElevenLabsEngine } from './speech/elevenlabs.js'
 import { systemEngine, warmUp } from './speech/system.js'
 import type { SpeakOptions, SpeechEngine } from './speech/types.js'
@@ -28,6 +29,10 @@ import { toSpeakable } from './text/speakable.js'
 import { createSettingsPanel } from './ui/settingsPanel.js'
 import { createStatusBar } from './ui/statusBar.js'
 import { createVolumePanel } from './ui/volumePanel.js'
+
+/** Trzymane na poziomie modułu, żeby `deactivate` mogło przywrócić głośność, gdyby okno zamknięto
+ *  w trakcie czytania — inaczej muzyka zostałaby ściszona do 10%. */
+let ducker: Ducker | undefined
 
 export function activate(context: vscode.ExtensionContext): void {
   // Zamknij katalog stanu na właściciela (0700) zanim cokolwiek do niego zapiszemy — trzyma klucz
@@ -42,6 +47,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const elevenLabs = createElevenLabsEngine({
     apiKey: () => secrets.getApiKey('elevenlabs'),
+    // Samonaprawa na 401: keychain bywa nieświeży tuż po przeładowaniu okna, więc pierwsze zapytanie
+    // może odbić się mimo poprawnego klucza. Wtedy silnik sięga po kopię z dysku i ponawia raz.
+    refreshApiKey: () => secrets.refreshFromDisk('elevenlabs'),
     voiceIdOverride: () => readSettings().elevenLabsVoiceId.trim() || undefined,
     voiceSettings: () => {
       const s = readSettings()
@@ -78,6 +86,19 @@ export function activate(context: vscode.ExtensionContext): void {
     onError: (error) => {
       void vscode.window.showErrorMessage(`Coding Voice: ${error.message}`)
     },
+  })
+
+  // Ściszanie innych aplikacji na czas czytania. Podpięte pod stan kontrolera, bo `setState` to jedyne
+  // miejsce, przez które przechodzą wszystkie przejścia (start, pauza, stop, koniec, błąd). Ściszamy przy
+  // wejściu w mówienie, przywracamy przy wyjściu — a że kolejne fragmenty jednej tury nie zmieniają stanu
+  // (`speaking` → `speaking` to nie-zdarzenie), nie ma migotania między zdaniami.
+  ducker = new Ducker(() => {
+    const s = readSettings()
+    return { enabled: s.duckSystemAudio, level: s.duckLevel, fadeMs: s.duckFade }
+  })
+  const duckSub = controller.onChange(() => {
+    if (controller.state === 'speaking') ducker?.engage()
+    else ducker?.release()
   })
 
   // Cztery ikony w pasku stanu: 🔊 · ▷ · szyna z odczytem · ⚙. Kliknięcie w szynę otwiera
@@ -196,11 +217,20 @@ export function activate(context: vscode.ExtensionContext): void {
       statusBar.refresh()
       volumePanel.refresh()
       settingsPanel.refresh()
+      // Wyłączenie ściszania w trakcie czytania ma natychmiast oddać głośność innym aplikacjom,
+      // a nie dopiero po końcu tury.
+      if (!readSettings().duckSystemAudio) ducker?.release()
     }),
+    duckSub,
+    { dispose: () => void ducker?.dispose() },
   )
 }
 
-export function deactivate(): void {
+export function deactivate(): Thenable<void> | undefined {
   // Hooki zostają zarejestrowane celowo: gdyby znikały przy każdym zamknięciu okna, wtyczka
   // przestawałaby działać po restarcie Cursora, zanim host rozszerzeń zdąży wstać.
+  //
+  // Głośność za to MUSIMY oddać: gdyby okno zamknięto w trakcie czytania, muzyka zostałaby ściszona
+  // do 10%. Zwracamy obietnicę, żeby host rozszerzeń poczekał na przywrócenie przed zabiciem procesu.
+  return ducker?.dispose()
 }

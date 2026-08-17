@@ -4,6 +4,23 @@ All notable changes to Coding Voice are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — 2026-08-17
+
+Added: optionally quiet other apps while a summary is read, then restore them to
+their previous level — no setup or permissions required. The level is relative to
+each app's own volume (50% keeps it half as loud, 100% leaves it untouched), with
+a configurable fade in and out. On Windows every other app is lowered per app,
+including a browser playing YouTube; on macOS Apple Music and Spotify are lowered
+automatically (macOS has no public API to control a browser's volume). Off by
+default; enable it with `codingVoice.duckSystemAudio`.
+
+Fixed: ElevenLabs errors are now reported accurately. A used-up character quota is
+no longer mislabelled as a rejected API key — ElevenLabs returns HTTP 401 for both,
+so the error body is inspected and an out-of-credits situation gets a clear
+message. A momentarily empty macOS keychain right after a window reload no longer
+surfaces as a key error either: the key is recovered from its on-disk backup and
+the request retried once, with no need to re-paste it.
+
 ## [1.0.1] — 2026-08-16
 
 Fixed: reading stopped working on Cursor 3.15+, which no longer includes the

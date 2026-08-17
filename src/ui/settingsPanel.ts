@@ -388,6 +388,39 @@ function html(): string {
         While an answer is playing, the new level takes over the current sentence.</div>
     </div>
 
+    <div class="group">Other apps</div>
+
+    <div class="row">
+      <div class="label"><span class="name">Quiet other apps while reading</span><span class="desc">Lower music/video while a summary plays, then restore. Windows: any app (incl. a browser on YouTube). macOS: Apple Music &amp; Spotify.</span></div>
+      <div class="control"><input type="checkbox" id="duckSystemAudio" /></div>
+    </div>
+
+    <div class="slider-row duck">
+      <div class="slider-top">
+        <span class="name">Keep at</span>
+        <span class="slider-val"><span id="duckLevelNum">40</span>%</span>
+      </div>
+      <div class="slider-line">
+        <span class="icon" title="Quieter"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6h2.5L8 3v10L4.5 10H2z"/><path d="M10.5 6.5c.7.8.7 2.2 0 3"/></svg></span>
+        <input type="range" id="duckLevel" min="0" max="100" step="1" />
+        <span class="icon" title="Louder"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6h2.5L8 3v10L4.5 10H2z"/><path d="M10.5 6c.9 1 .9 3 0 4"/><path d="M12.3 4.5c1.6 1.7 1.6 5.3 0 7"/></svg></span>
+      </div>
+      <div class="hint">Share of each app's own volume kept while a summary is read. 100% = untouched, 50% = half as loud. Lower = quieter background.</div>
+    </div>
+
+    <div class="slider-row duck">
+      <div class="slider-top">
+        <span class="name">Fade</span>
+        <span class="slider-val"><span id="duckFadeNum">0.6</span>s</span>
+      </div>
+      <div class="slider-line">
+        <span class="icon" title="Instant"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v6l4 2"/><circle cx="8" cy="8" r="6"/></svg></span>
+        <input type="range" id="duckFade" min="0" max="5000" step="100" />
+        <span class="icon" title="Slower"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 4v4l3 1.5"/></svg></span>
+      </div>
+      <div class="hint">How smoothly the volume slides down when reading starts and back up when it ends. 0 is instant.</div>
+    </div>
+
     <div class="group">ElevenLabs</div>
 
     <div class="info">
@@ -522,6 +555,13 @@ function html(): string {
   $('enabled').addEventListener('change', (e) => set('enabled', e.target.checked));
   $('skipCodeBlocks').addEventListener('change', (e) => set('skipCodeBlocks', e.target.checked));
   $('announceProject').addEventListener('change', (e) => set('announceProject', e.target.checked));
+  $('duckSystemAudio').addEventListener('change', (e) => set('duckSystemAudio', e.target.checked));
+
+  // Ściszanie innych aplikacji: poziom w %, czas fade pokazujemy w sekundach, zapis po puszczeniu.
+  $('duckLevel').addEventListener('input', (e) => { $('duckLevelNum').textContent = e.target.value; });
+  $('duckLevel').addEventListener('change', (e) => set('duckLevel', Number(e.target.value)));
+  $('duckFade').addEventListener('input', (e) => { $('duckFadeNum').textContent = (Number(e.target.value) / 1000).toFixed(1); });
+  $('duckFade').addEventListener('change', (e) => set('duckFade', Number(e.target.value)));
   for (const id of ['engine', 'voice', 'language', 'scope']) {
     $(id).addEventListener('change', (e) => set(id, e.target.value));
   }
@@ -591,6 +631,9 @@ function html(): string {
     $('enabled').checked = s.enabled;
     $('skipCodeBlocks').checked = s.skipCodeBlocks;
     $('announceProject').checked = s.announceProject;
+    $('duckSystemAudio').checked = s.duckSystemAudio;
+    $('duckLevel').value = String(Math.round(s.duckLevel)); $('duckLevelNum').textContent = String(Math.round(s.duckLevel));
+    $('duckFade').value = String(Math.round(s.duckFade)); $('duckFadeNum').textContent = (Math.round(s.duckFade) / 1000).toFixed(1);
     $('engine').value = s.engine === 'elevenlabs' ? 'elevenlabs' : 'system';
     $('voice').value = s.voice;
     $('language').value = s.language;

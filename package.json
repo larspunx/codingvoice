@@ -2,7 +2,7 @@
   "name": "coding-voice",
   "displayName": "Coding Voice",
   "description": "Reads the agent's answer out loud when a prompt finishes. Play/pause in the status bar, your own TTS API key, multiple languages.",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "publisher": "larspunx",
   "license": "MIT",
   "icon": "assets/logo.png",
@@ -182,6 +182,25 @@
           "type": "boolean",
           "default": false,
           "description": "Start every summary with the project name. Helpful when several Cursor windows read aloud at once — you hear which project a summary belongs to."
+        },
+        "codingVoice.duckSystemAudio": {
+          "type": "boolean",
+          "default": false,
+          "description": "Quiet other apps while a summary is read, then restore them to their previous level. Windows: every other app (including a browser playing YouTube) is lowered per app. macOS: Apple Music and Spotify are lowered automatically — macOS has no public API to control a browser's volume, so YouTube in a browser is not affected there."
+        },
+        "codingVoice.duckLevel": {
+          "type": "number",
+          "default": 40,
+          "minimum": 0,
+          "maximum": 100,
+          "description": "How much of each app's own volume to keep while reading, in percent of what it was playing. 100 = untouched, 50 = half as loud, 0 = silent. Lower = quieter background. Only used when 'Duck system audio' is on."
+        },
+        "codingVoice.duckFade": {
+          "type": "number",
+          "default": 600,
+          "minimum": 0,
+          "maximum": 5000,
+          "description": "How long the volume fades down when reading starts and back up when it ends, in milliseconds. 0 makes it instant. Only used when 'Duck system audio' is on."
         }
       }
     },

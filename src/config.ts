@@ -33,6 +33,13 @@ export interface Settings {
   skipCodeBlocks: boolean
   /** Poprzedź każde podsumowanie nazwą projektu — po głosie od razu wiadomo, którego okna dotyczy. */
   announceProject: boolean
+  /** Ścisz inne aplikacje (muzyka, YouTube) na czas czytania i przywróć po nim — patrz `speech/duck.ts`. */
+  duckSystemAudio: boolean
+  /** Ile z WŁASNEJ głośności każdej aplikacji zostawić na czas czytania, w procentach (0–100):
+   *  100 = bez zmian, 50 = o połowę ciszej, 0 = cisza. Względne, nie bezwzględne — patrz `speech/duck.ts`. */
+  duckLevel: number
+  /** Czas płynnego przejścia głośności (fade) w obie strony, w milisekundach. 0 = skokowo. */
+  duckFade: number
 }
 
 const SECTION = 'codingVoice'
@@ -55,6 +62,9 @@ export function readSettings(): Settings {
     maxCharacters: config.get<number>('maxCharacters', 0),
     skipCodeBlocks: config.get<boolean>('skipCodeBlocks', true),
     announceProject: config.get<boolean>('announceProject', false),
+    duckSystemAudio: config.get<boolean>('duckSystemAudio', false),
+    duckLevel: config.get<number>('duckLevel', 40),
+    duckFade: config.get<number>('duckFade', 600),
   }
 }
 
