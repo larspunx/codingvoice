@@ -102,15 +102,24 @@ left untouched.
 
 ## Releasing a new version
 
+**One-time setup:** create an [Open VSX](https://open-vsx.org) account, sign the Eclipse
+Foundation Publisher Agreement, create the `larspunx` namespace
+(`npx ovsx create-namespace larspunx -p <token>`), generate an access token, and export
+it so it sticks: `export OVSX_PAT=…` in your shell profile.
+
+**Each release:**
+
 1. Bump `version` in `package.json` (keep `.cursor-plugin/plugin.json` in sync).
 2. Update `CHANGELOG.md`.
-3. `npm test && npm run package` — produces `coding-voice-X.Y.Z.vsix`.
-4. Commit `dist/`, push `main`, and tag `vX.Y.Z`.
-5. Publish to [Open VSX](https://open-vsx.org) — Cursor's Extensions panel reads from it:
+3. Commit `dist/`, push `main`, and tag `vX.Y.Z`.
+4. Publish in one step — typechecks, builds, packages and uploads:
 
 ```bash
-npx ovsx publish coding-voice-X.Y.Z.vsix -p "$OVSX_PAT"
+npm run release
 ```
+
+`npm run release` runs the tests, then `ovsx publish` (which reads `OVSX_PAT` from the
+environment). To only build a local `.vsix` without publishing, run `npm run package`.
 
 ## Development
 

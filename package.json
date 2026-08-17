@@ -228,12 +228,17 @@
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test src/*/*.test.ts",
-    "package": "npm run typecheck && npm run build && npx @vscode/vsce package"
+    "vscode:prepublish": "npm run typecheck && npm run build",
+    "package": "vsce package",
+    "publish:ovsx": "ovsx publish",
+    "release": "npm test && npm run publish:ovsx"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
     "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.9.2",
     "esbuild": "^0.24.0",
+    "ovsx": "^1.1.1",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
   }
