@@ -27,6 +27,8 @@ import {
   pendingFile,
   pendingWsFile,
   queueDir,
+  ringDir,
+  RING_SIGNAL,
 } from '../shared/paths.js'
 import { parseWorkspaceRoot, workspaceTag } from '../shared/workspace.js'
 
@@ -74,14 +76,15 @@ function capture(payload: string): void {
   }
 }
 
-function promote(): void {
+/** Domknięcie tury Cursora. Zwraca `true`, gdy było co przeczytać i wpis trafił do kolejki. */
+function promote(): boolean {
   let text = ''
   try {
     text = fs.readFileSync(pendingFile, 'utf8')
   } catch {
-    return // tura bez odpowiedzi (np. sama praca narzędziami) — nie ma czego czytać
+    return false // tura bez odpowiedzi (np. sama praca narzędziami) — nie ma czego czytać
   }
-  if (!text.trim()) return
+  if (!text.trim()) return false
   let ws = ''
   try {
     ws = fs.readFileSync(pendingWsFile, 'utf8')
@@ -91,6 +94,33 @@ function promote(): void {
   enqueue(text, workspaceTag(ws))
   fs.rmSync(pendingFile, { force: true }) // zużyte — kolejny `stop` bez nowej odpowiedzi ma milczeć
   fs.rmSync(pendingWsFile, { force: true })
+  return true
+}
+
+/**
+ * Sygnał „Twoja kolej": tura skończyła się bez wypowiedzi, więc agent zapewne czeka na decyzję
+ * (pytanie przez narzędzie, plan, same edycje). Wkładamy znacznik do OSOBNEGO kanału ringu (`ringDir`),
+ * nie do kolejki tekstu — rozszerzenie zagra krótki dźwięk zamiast mówić, a stary host obserwujący tylko
+ * `queueDir` w ogóle go nie zobaczy (cisza zamiast czytania sentinela). Pomijamy przerwane/błędne
+ * domknięcia: `aborted` to reakcja na kliknięcie użytkownika (nie zaskakujmy go dźwiękiem), `error` ma
+ * własną ścieżkę komunikatu.
+ */
+function ringIfWaiting(payload: string): void {
+  let status = ''
+  let ws = ''
+  try {
+    const parsed = JSON.parse(payload) as { status?: string }
+    status = typeof parsed.status === 'string' ? parsed.status : ''
+  } catch {
+    /* payload bez JSON-a — traktujemy jak zwykłe domknięcie */
+  }
+  if (status === 'aborted' || status === 'error') return
+  try {
+    ws = parseWorkspaceRoot(payload)
+  } catch {
+    /* bez workspace zadzwoni pierwsze okno, które przejmie wpis (rename jest atomowy) */
+  }
+  enqueue(RING_SIGNAL, workspaceTag(ws), ringDir)
 }
 
 /* ------------------------------- Claude Code ------------------------------- */
@@ -149,13 +179,16 @@ function fromClaudeCode(payload: string): void {
     log(`claude: brak transkryptu (${transcript || 'ścieżka pusta'})`)
     return
   }
+  // Payload `Stop` Claude Code niesie `cwd` — wystarcza, by przypisać wypowiedź do właściwego okna.
+  const tag = workspaceTag(parseWorkspaceRoot(payload))
   const text = lastAssistantText(transcript)
   if (!text) {
-    log('claude: w transkrypcie nie ma wypowiedzi asystenta')
+    // Tura bez wypowiedzi asystenta = agent zrobił coś niewerbalnego i czeka na Ciebie. Zamiast
+    // milczeć, dajemy krótki sygnał „Twoja kolej" — osobnym kanałem ringu (patrz `ringIfWaiting`).
+    enqueue(RING_SIGNAL, tag, ringDir)
     return
   }
-  // Payload `Stop` Claude Code niesie `cwd` — wystarcza, by przypisać wypowiedź do właściwego okna.
-  enqueue(text, workspaceTag(parseWorkspaceRoot(payload)))
+  enqueue(text, tag)
 }
 
 /* --------------------------- transkrypt Cursora ---------------------------- */
@@ -177,19 +210,20 @@ function textFromCursorTranscript(payload: string): string {
 
 /* --------------------------------- kolejka --------------------------------- */
 
-function enqueue(text: string, tag = ''): void {
-  fs.mkdirSync(queueDir, { recursive: true })
-  dropStaleEntries()
+function enqueue(text: string, tag = '', dir: string = queueDir): void {
+  fs.mkdirSync(dir, { recursive: true })
+  dropStaleEntries(dir)
 
   // Nazwa: `<znacznik czasu>-<losowy sufiks>[-<tag workspace>].txt`.
   //   • znacznik czasu → rozszerzenie odrzuca przeterminowane wpisy bez czytania zawartości,
   //   • losowy sufiks  → dwie tury mogą domknąć się w tej samej milisekundzie,
   //   • tag workspace  → wpis przeczyta tylko okno z tego samego projektu (patrz shared/workspace).
-  // Tag i sufiks są base36 (bez „-"), więc podział po „-" pozostaje jednoznaczny.
+  // Tag i sufiks są base36 (bez „-"), więc podział po „-" pozostaje jednoznaczny. `dir` to `queueDir`
+  // dla tekstu albo `ringDir` dla sygnału ringu — ta sama mechanika nazw/przejęcia w obu kanałach.
   const rand = Math.random().toString(36).slice(2, 8)
   const suffix = tag ? `-${tag}` : ''
   const name = `${Date.now()}-${rand}${suffix}.txt`
-  const target = path.join(queueDir, name)
+  const target = path.join(dir, name)
   // Zapis przez plik tymczasowy i rename: rozszerzenie obserwuje katalog i inaczej zdążyłoby
   // podnieść plik w połowie zapisu.
   const tmp = `${target}.part`
@@ -197,12 +231,12 @@ function enqueue(text: string, tag = ''): void {
   fs.renameSync(tmp, target)
 }
 
-function dropStaleEntries(): void {
+function dropStaleEntries(dir: string): void {
   const now = Date.now()
-  for (const entry of fs.readdirSync(queueDir)) {
+  for (const entry of fs.readdirSync(dir)) {
     const stamp = Number.parseInt(entry.split('-')[0] ?? '', 10)
     if (Number.isFinite(stamp) && now - stamp > QUEUE_TTL_MS) {
-      fs.rmSync(path.join(queueDir, entry), { force: true })
+      fs.rmSync(path.join(dir, entry), { force: true })
     }
   }
 }
@@ -214,8 +248,9 @@ async function main(): Promise<void> {
   const payload = await readStdin()
   try {
     if (mode === 'capture') capture(payload)
-    else if (mode === 'speak') promote()
-    else if (mode === 'claude') fromClaudeCode(payload)
+    else if (mode === 'speak') {
+      if (!promote()) ringIfWaiting(payload)
+    } else if (mode === 'claude') fromClaudeCode(payload)
     else log(`nieznany tryb: ${String(mode)}`)
   } catch (error) {
     log(`błąd w trybie ${String(mode)}: ${String(error)}`)

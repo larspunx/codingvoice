@@ -10,12 +10,15 @@
  *     → kontroler mówi fragment po fragmencie, pasek stanu pokazuje stan
  */
 import * as fs from 'node:fs'
+import * as path from 'node:path'
 import * as vscode from 'vscode'
 import { installHooks } from './bridge/install.js'
 import { watchQueue } from './bridge/queue.js'
+import { createSpeechLock } from './bridge/speechLock.js'
 import { affectsUs, readSettings, speakOptions, updateSetting } from './config.js'
 import { Secrets } from './secrets.js'
-import { ensureStateDir, lastSpokenFile } from './shared/paths.js'
+import { ensureStateDir, lastSpokenFile, ringDir } from './shared/paths.js'
+import { playSoundFile } from './speech/playback.js'
 import { workspaceTag } from './shared/workspace.js'
 import { SpeechController } from './speech/controller.js'
 import { Ducker } from './speech/duck.js'
@@ -88,6 +91,18 @@ export function activate(context: vscode.ExtensionContext): void {
     },
   })
 
+  // Szeregowanie mowy MIĘDZY oknami Cursora. Każdy projekt otwarty w osobnym oknie ma własny host
+  // rozszerzeń i własny kontroler — bez koordynacji dwa podsumowania domknięte w zbliżonym momencie
+  // zaczęłyby czytać naraz, głos na głosie. Globalny zamek (plik w katalogu stanu) przepuszcza mowę
+  // jednego okna, resztę wstrzymuje: kolejne rusza dopiero, gdy poprzednie skończy i zamek zwolni.
+  const speechLock = createSpeechLock()
+  // `holdingLock` — czy TO okno trzyma teraz zamek (mówi). `acquiring` — czy właśnie czekamy w kolejce
+  // na zwolnienie przez inne okno. `pendingText` — najświeższy tekst do wypowiedzenia po zdobyciu zamka;
+  // gdy w czasie czekania przyjdzie nowsza tura, nadpisuje starą (mówimy tylko to, co aktualne).
+  let holdingLock = false
+  let acquiring = false
+  let pendingText: string | undefined
+
   // Ściszanie innych aplikacji na czas czytania. Podpięte pod stan kontrolera, bo `setState` to jedyne
   // miejsce, przez które przechodzą wszystkie przejścia (start, pauza, stop, koniec, błąd). Ściszamy przy
   // wejściu w mówienie, przywracamy przy wyjściu — a że kolejne fragmenty jednej tury nie zmieniają stanu
@@ -99,6 +114,13 @@ export function activate(context: vscode.ExtensionContext): void {
   const duckSub = controller.onChange(() => {
     if (controller.state === 'speaking') ducker?.engage()
     else ducker?.release()
+    // Koniec (lub pauza/stop) tego okna zwalnia globalny zamek, żeby czekające okno mogło ruszyć.
+    // Kolejne fragmenty jednej tury nie ruszają stanu (`speaking` → `speaking`), więc zamek trzymamy
+    // nieprzerwanie aż do realnego wyjścia z mówienia — bez oddawania i odbijania między zdaniami.
+    if (controller.state !== 'speaking' && holdingLock) {
+      holdingLock = false
+      speechLock.release()
+    }
   })
 
   // Cztery ikony w pasku stanu: 🔊 · ▷ · szyna z odczytem · ⚙. Kliknięcie w szynę otwiera
@@ -121,11 +143,44 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Wypowiedz gotowy do czytania tekst: rozpoznaj język i zacznij od początku. Zapisujemy go też
   // na dysk, żeby przycisk play mógł go powtórzyć nawet po przeładowaniu okna, gdy pamięć jest pusta.
+  //
+  // Zanim zaczniemy mówić, przechodzimy przez globalny zamek (patrz `speechLock`): jeśli inne okno
+  // właśnie czyta, czekamy w kolejce, a nie wchodzimy mu w głos. Trzy ścieżki:
+  //   • już trzymamy zamek (mówimy) → nowa tura po prostu zastępuje bieżącą (`speakNew` przerywa),
+  //     zamek zostaje nasz;
+  //   • już czekamy na zamek → zapamiętujemy najświeższy tekst, odezwiemy się nim po jego zdobyciu;
+  //   • zamek wolny/do przejęcia → bierzemy go i mówimy.
   const speakText = (text: string): void => {
     // Fire-and-forget: zapis powtórki nie może wstrzymywać mowy ani wywalić rozszerzenia przy
     // pełnym dysku — najwyżej powtórka po restarcie nie zadziała.
     fs.writeFile(lastSpokenFile, text, () => undefined)
-    controller.speakNew(text)
+
+    if (holdingLock) {
+      controller.speakNew(text)
+      return
+    }
+    pendingText = text // najnowsza tura wygrywa, gdyby w czasie czekania przyszła kolejna
+    if (acquiring) return
+
+    acquiring = true
+    void speechLock
+      .acquire()
+      .then(() => {
+        acquiring = false
+        const next = pendingText
+        pendingText = undefined
+        // W czasie czekania czytanie mogło zostać wyłączone albo tekst zdezaktualizowany — wtedy
+        // oddajemy zamek od razu, nie blokując innych okien mową, której już nie chcemy.
+        if (next === undefined || !readSettings().enabled) {
+          speechLock.release()
+          return
+        }
+        holdingLock = true
+        controller.speakNew(next) // stan wejdzie w `speaking`; zamek zwolni `onChange` na wyjściu
+      })
+      .catch(() => {
+        acquiring = false
+      })
   }
 
   // Tagi workspace tego okna — czytamy tylko wypowiedzi z projektów tu otwartych. Zbiór jest
@@ -140,6 +195,22 @@ export function activate(context: vscode.ExtensionContext): void {
   refreshOwnTags()
   context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(refreshOwnTags))
 
+  // Deduplikacja tej samej tury.
+  //
+  // Kolejka broni się przed dwoma oknami czytającymi TEN SAM plik (atomowy `rename`), ale nie przed
+  // DWOMA plikami o tej samej treści. A takie powstają, gdy jedną turę domkną DWA niezależne kanały
+  // hooków: `stop` Cursora (promuje bufor do kolejki) ORAZ `Stop` panelu Claude Code (czyta ostatnią
+  // wypowiedź z transkryptu). Oba wstawiają tę samą odpowiedź, więc okno czyta ją dwa razy z poślizgiem
+  // kilku milisekund — pogłos. Dzieje się „czasami", bo kanał Claude odzywa się tylko, gdy w jego
+  // transkrypcie jest już wypowiedź. Zapamiętujemy więc ostatni czytany tekst i czas: to samo w krótkim
+  // oknie leci raz. Porównujemy PO oczyszczeniu i ze zbitymi odstępami, bo oba źródła potrafią dać ten
+  // sam tekst różniący się samym łamaniem linii.
+  const DEDUP_WINDOW_MS = 10_000
+  let lastEnqueued = { key: '', at: 0 }
+
+  // Kolejka tekstu: hook wkłada tu wyłącznie prawdziwe wypowiedzi. Sygnał ringu jedzie OSOBNYM
+  // kanałem (niżej), więc tu nie ma już żadnego sentinela do rozpoznawania — a stary host czytający
+  // tylko ten katalog nigdy nie dostanie ringu i nie spróbuje go wymówić.
   const queue = watchQueue((raw) => {
     const settings = readSettings()
     if (!settings.enabled) return
@@ -150,12 +221,44 @@ export function activate(context: vscode.ExtensionContext): void {
       skipCodeBlocks: settings.skipCodeBlocks,
     })
     if (!text) return // odpowiedź była samym kodem albo tabelą — nie ma czego czytać
+    // Ta sama wypowiedź drugi raz w oknie kilku sekund = duplikat z drugiego kanału, nie nowa tura.
+    const now = Date.now()
+    const key = text.replace(/\s+/g, ' ').trim()
+    if (key === lastEnqueued.key && now - lastEnqueued.at < DEDUP_WINDOW_MS) return
+    lastEnqueued = { key, at: now }
     // Nazwa projektu na początku (opcjonalnie): przy kilku oknach czytających naraz od razu słychać,
     // którego projektu dotyczy podsumowanie. Osobne zdanie, żeby lektor zrobił po niej pauzę.
     const projectName = vscode.workspace.workspaceFolders?.[0]?.name
     const spoken = settings.announceProject && projectName ? `${projectName}. ${text}` : text
     speakText(spoken)
   }, ownTags)
+
+  // Osobny kanał sygnału „Twoja kolej" (`ringDir`): hook wkłada tu plik, gdy tura kończy się bez
+  // wypowiedzi (pytanie przez narzędzie, plan, same edycje). Gramy dźwięk wprost, z pominięciem
+  // kontrolera mowy i ściszania — to powiadomienie, nie czytanie, więc działa też przy wyłączonym
+  // czytaniu. Treść pliku ignorujemy: liczy się samo jego pojawienie się (tag kieruje go do okna).
+  const ringFile = path.join(context.extensionPath, 'assets', 'ring.mp3')
+  // Ten sam duplikat co przy tekście dotyczy ringu: kilka procesów `speak` może wstawić po jednym
+  // pliku ringu. Że ring nie niesie treści, deduplikujemy po samym czasie — dwa sygnały w krótkim
+  // oknie to jedno „Twoja kolej", nie dwa. Okno węższe niż przy tekście, bo tura bez wypowiedzi jest
+  // krótsza i realny kolejny ring i tak przyjdzie później.
+  const RING_DEDUP_MS = 2500
+  let lastRingAt = 0
+  const ring = watchQueue(
+    () => {
+      if (!readSettings().ring) return
+      const now = Date.now()
+      if (now - lastRingAt < RING_DEDUP_MS) return
+      lastRingAt = now
+      void playSoundFile(
+        ringFile,
+        Math.max(0, Math.min(1, readSettings().volume / 100)),
+        new AbortController().signal,
+      ).catch(() => undefined)
+    },
+    ownTags,
+    ringDir,
+  )
 
   context.subscriptions.push(
     statusBar,
@@ -167,6 +270,7 @@ export function activate(context: vscode.ExtensionContext): void {
       webviewOptions: { retainContextWhenHidden: true },
     }),
     queue,
+    ring,
     // Kliknięcie w szynę otwiera interaktywny suwak w dolnym panelu — jedyne miejsce w API,
     // gdzie „łapię i przesuwam" działa, to webview z własnym DOM-em.
     vscode.commands.registerCommand('codingVoice.setVolume', () => volumePanel.open()),
@@ -223,6 +327,8 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     duckSub,
     { dispose: () => void ducker?.dispose() },
+    // Zamknięcie okna oddaje globalny zamek od ręki, żeby czekające okno nie musiało czekać na TTL.
+    { dispose: () => speechLock.dispose() },
   )
 }
 

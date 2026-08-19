@@ -30,6 +30,12 @@ const SYMBOLS: ReadonlyArray<readonly [string, string]> = [
 const PICTOGRAMS =
   /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}]/gu
 
+/** Strefa prywatna Unicode (PUA): U+E000–U+F8FF plus dwie płaszczyzny dodatkowe. Tu siedzą nasze
+ *  wewnętrzne sentinele sterujące (np. `RING_SIGNAL`) i glify bez wymowy. Wycinamy je do pustego,
+ *  żeby ŻADEN sygnał sterujący nigdy nie trafił do lektora jako słowa — nawet gdyby przeciekł do
+ *  ścieżki mowy zamiast zostać rozpoznany wcześniej. Prawdziwy tekst agenta nie zawiera PUA. */
+const PRIVATE_USE = /[\uE000-\uF8FF]|[\u{F0000}-\u{FFFFD}]|[\u{100000}-\u{10FFFD}]/gu
+
 /** Goły URL / mail — syntezator próbuje to „wymawiać" (http, dwukropek, slash…) i wychodzi
  *  jęczenie albo bełkot. Takie rzeczy wypadają z wypowiedzi całkowicie. */
 const BARE_URL =
@@ -115,7 +121,9 @@ function truncateAtSentence(text: string, limit: number): string {
 
 export function toSpeakable(markdown: string, options: SpeakableOptions = {}): string {
   const { maxCharacters = 0, skipCodeBlocks = true } = options
-  let t = markdown
+  // Znaki sterujące ze strefy prywatnej (nasze sentinele) wypadają NAJPIERW: sygnał złożony z samego
+  // PUA schodzi do pustego łańcucha, więc `toSpeakable` zwróci '', a wywołujący nic nie przeczyta.
+  let t = markdown.replace(PRIVATE_USE, '')
 
   if (skipCodeBlocks) {
     t = t.replace(/```[\s\S]*?```/g, ' ')

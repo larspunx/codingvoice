@@ -224,12 +224,29 @@ export const systemEngine: SpeechEngine = {
       // Tekst przez stdin (`-f -`), nie jako argument: odpowiedź agenta potrafi mieć każdy znak,
       // a limit długości argumentu jest twardy.
       args.push('-f', '-')
-      // `say` nie ma flagi głośności — jedyne wejście to polecenie osadzone w treści. Skaluje ono
-      // sam strumień lektora, więc głośność systemu i innych aplikacji zostaje nietknięta.
-      // Przy pełnej głośności nie dopisujemy nic: po co karmić parser poleceń, skoro nie ma czego
-      // zmieniać.
-      const prefix = options.volume < 1 ? `[[volm ${options.volume.toFixed(2)}]]` : ''
-      return run('/usr/bin/say', args, signal, prefix + escapeMacCommands(text))
+      const content = escapeMacCommands(text)
+
+      // Pełna głośność: gramy na żywo, zero opóźnienia — nie ma czego skalować.
+      if (options.volume >= 1) {
+        return run('/usr/bin/say', args, signal, content)
+      }
+
+      // Ciszej niż 100%: osadzone `[[volm ...]]` macOS przy renderze IGNORUJE (sprawdzone —
+      // nawet `volm 0.0` nie daje ciszy), więc głośność systemowego głosu w ogóle nie działała.
+      // Renderujemy więc fragment do pliku i gramy go przez `afplay -v`, którego `-v` to realny
+      // mnożnik głośności TEGO strumienia (0 = cisza, 1 = poziom pliku). Systemu i innych aplikacji
+      // to nie rusza. Koszt: fragment musi się najpierw wyrenderować — ale tylko wtedy, gdy ktoś
+      // faktycznie ściszył głos.
+      fs.mkdirSync(stateDir, { recursive: true })
+      const clip = path.join(stateDir, `say-${Date.now()}-${Math.random().toString(36).slice(2)}.aiff`)
+      try {
+        await run('/usr/bin/say', [...args, '-o', clip], signal, content)
+        if (signal.aborted) return
+        await run('/usr/bin/afplay', ['-v', options.volume.toFixed(3), clip], signal)
+      } finally {
+        fs.rm(clip, { force: true }, () => undefined)
+      }
+      return
     }
 
     if (process.platform === 'win32') {

@@ -22,8 +22,8 @@ const CLAIM_MARK = '.claim.'
 
 /** Sprzątanie po instancji, która padła między przejęciem a skasowaniem wpisu. Bez tego
  *  osierocony plik zostawałby w kolejce na zawsze. */
-function sweepStaleClaim(entry: string): void {
-  const file = path.join(queueDir, entry)
+function sweepStaleClaim(dir: string, entry: string): void {
+  const file = path.join(dir, entry)
   try {
     if (Date.now() - fs.statSync(file).mtimeMs > MAX_AGE_MS) fs.rmSync(file, { force: true })
   } catch {
@@ -47,12 +47,17 @@ function tagOf(entry: string): string {
  * @param ownTags  tagi workspace tego okna. Okno konsumuje wpisy o zgodnym tagu oraz wpisy bez tagu;
  *                 wpisy z CUDZYM tagiem zostawia — przeczyta je okno z właściwego projektu. Dzięki
  *                 temu dwa okna z różnymi silnikami nie kłócą się o tę samą turę.
+ * @param dir      obserwowany katalog. Domyślnie `queueDir` (tekst); `ringDir` dla kanału ringu, który
+ *                 dzieli tę samą mechanikę (tag w nazwie, atomowe przejęcie, TTL), ale zamiast czytać —
+ *                 wywołujący gra dźwięk. Rozdzielenie katalogów sprawia, że stary host obserwujący tylko
+ *                 `queueDir` nigdy nie zobaczy ringu i nie spróbuje go przeczytać.
  */
 export function watchQueue(
   onText: (text: string) => void,
   ownTags: ReadonlySet<string> = new Set(),
+  dir: string = queueDir,
 ): QueueWatcher {
-  fs.mkdirSync(queueDir, { recursive: true })
+  fs.mkdirSync(dir, { recursive: true })
 
   let draining = false
   const drain = (): void => {
@@ -60,9 +65,9 @@ export function watchQueue(
     draining = true
     try {
       // Sortowanie po nazwie = po znaczniku czasu; przy zaległości czytamy w kolejności zdarzeń.
-      for (const entry of fs.readdirSync(queueDir).sort()) {
+      for (const entry of fs.readdirSync(dir).sort()) {
         if (entry.includes(CLAIM_MARK)) {
-          sweepStaleClaim(entry)
+          sweepStaleClaim(dir, entry)
           continue
         }
         if (!entry.endsWith('.txt')) continue // pliki `.part` to zapis w toku
@@ -72,7 +77,7 @@ export function watchQueue(
         const tag = tagOf(entry)
         if (tag && !ownTags.has(tag)) continue
 
-        const file = path.join(queueDir, entry)
+        const file = path.join(dir, entry)
         const claim = `${file}${CLAIM_MARK}${process.pid}`
 
         // Przejęcie wpisu przez `rename`, a nie przez „odczytaj, potem skasuj".
@@ -116,7 +121,7 @@ export function watchQueue(
 
   let watcher: fs.FSWatcher | undefined
   try {
-    watcher = fs.watch(queueDir, () => drain())
+    watcher = fs.watch(dir, () => drain())
   } catch {
     // Zostaje samo odpytywanie.
   }

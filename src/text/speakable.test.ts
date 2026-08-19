@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { RING_SIGNAL } from '../shared/paths.js'
 import { toSpeakable } from './speakable.js'
 
 test('blok kodu i tabela wypadają w całości', () => {
@@ -65,6 +66,14 @@ test('skróty klawiszowe stają się wymawialne', () => {
 
 test('emoji nie są czytane', () => {
   assert.equal(toSpeakable('Gotowe ✅ 🚀 działa.'), 'Gotowe ok działa.')
+})
+
+test('znaki strefy prywatnej (sygnały sterujące) wypadają — nigdy nie trafiają do lektora', () => {
+  // Sam sygnał ringu schodzi do pustego: gdyby przeciekł do ścieżki mowy, wywołujący nic nie przeczyta.
+  assert.equal(toSpeakable(RING_SIGNAL), '')
+  assert.equal(toSpeakable('\uE000\uE001\uE002'), '')
+  // PUA wtopione w tekst znika, treść zostaje.
+  assert.equal(toSpeakable('Gotowe\uE000 działa.'), 'Gotowe działa.')
 })
 
 test('punktory i numeracja znikają, każdy punkt jest osobnym zdaniem', () => {

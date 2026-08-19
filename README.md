@@ -84,6 +84,11 @@ On first activation the extension registers hooks in `~/.cursor/hooks.json`. The
 | `codingVoice.duckLevel` | How much of each app's own volume to keep while reading (percent). |
 | `codingVoice.duckFade` | Fade time for the volume dip, in milliseconds. |
 
+> **Ducking, by platform.** On **Windows** every app is lowered individually — including a browser
+> playing YouTube. On **macOS** the players Music, TV, Spotify and Swinsian are lowered automatically,
+> but a browser tab (YouTube in Chrome/Safari) can't be: macOS exposes no public API for a browser's
+> per-app volume, so that source keeps playing at its level.
+
 Your API key is stored in the OS keychain, never in `settings.json`.
 
 ## Privacy

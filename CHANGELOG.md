@@ -4,6 +4,20 @@ All notable changes to Coding Voice are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] — 2026-08-20
+
+Added: a short "your turn" ring when a turn ends needing you with nothing to read
+aloud — a question, a plan, or edit-only work. On by default (`codingVoice.ring`).
+
+Fixed: the reading-volume slider now applies to the macOS system voice; levels
+below 100% previously had no effect.
+
+Fixed: the same answer is no longer read twice when two hook channels close one turn.
+
+Changed: ducking scope is now documented. On Windows every app is lowered, including
+a browser playing YouTube; on macOS Music, TV, Spotify and Swinsian are lowered
+automatically, but a browser tab (YouTube in Chrome/Safari) cannot be.
+
 ## [1.1.2] — 2026-08-18
 
 Changed: better discoverability on the marketplace — added the `AI` category

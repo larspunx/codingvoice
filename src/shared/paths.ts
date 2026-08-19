@@ -53,8 +53,40 @@ export const pendingWsFile = path.join(stateDir, 'pending-ws.txt')
 /** Kolejka gotowych wypowiedzi. Jeden plik = jedna zakończona tura. Rozszerzenie je konsumuje i kasuje. */
 export const queueDir = path.join(stateDir, 'queue')
 
+/**
+ * Osobny kanał sygnału „Twoja kolej" (ring) — CELOWO poza `queueDir`.
+ *
+ * Dawniej ring jechał tą samą kolejką co tekst, jako sentinel w treści wpisu. Problem: host, który tego
+ * sentinela NIE rozpoznaje (starsza wersja rozszerzenia sprzed funkcji ringu albo inne okno w trakcie
+ * aktualizacji), traktował go jak zwykły tekst i próbował przeczytać — raz „coding voice ring", raz samą
+ * doklejoną kropkę („kropka"). Nie da się tego naprawić po stronie treści, bo starego hosta nie zmienimy.
+ *
+ * Rozdzielenie kanałów rozwiązuje to u źródła: hook wkłada ring TU, a stare hosty obserwują wyłącznie
+ * `queueDir`, więc pliku ringu po prostu nigdy nie zobaczą (cisza zamiast czytania), a `queueDir` niosący
+ * już tylko prawdziwy tekst czytają normalnie. Nowe rozszerzenie obserwuje oba katalogi i na plik z tego
+ * gra dźwięk. Treść pliku nie ma znaczenia — liczy się samo jego pojawienie się (tag w nazwie kieruje go
+ * do właściwego okna, jak w `queueDir`). */
+export const ringDir = path.join(stateDir, 'ring')
+
+/**
+ * Treść pliku ringu wkładanego do `ringDir`. To TYLKO znacznik — ring rozpoznajemy po samym pojawieniu
+ * się pliku w osobnym katalogu (patrz `ringDir`), a nie po treści, więc ta wartość nigdy nie trafia do
+ * ścieżki mowy. Znaki ze strefy prywatnej Unicode (PUA) trzymamy dla pewności: gdyby jakiś przyszły kod
+ * kiedyś jednak podał ją do lektora, `toSpeakable` wycina PUA do pustego i nic się nie wypowie. */
+export const RING_SIGNAL = '\uE000\uE001\uE002'
+
 /** Ostatnio wypowiedziany tekst — do powtórki przyciskiem, także gdy czytanie jest wyłączone. */
 export const lastSpokenFile = path.join(stateDir, 'last-spoken.txt')
+
+/**
+ * Globalny zamek mowy — JEDEN plik dla wszystkich okien Cursora.
+ *
+ * Każde okno to osobny host rozszerzeń, ale wszystkie dzielą ten katalog. Bez zamka dwa projekty,
+ * które skończą turę w zbliżonym momencie, zaczęłyby czytać naraz — dwa głosy jeden na drugim.
+ * Kto trzyma ten plik, ten mówi; reszta czeka, aż zwolni, i dopiero wtedy rusza. Plik nosi znacznik
+ * właściciela i czas (bicie serca), więc okno, które padło w trakcie czytania, po TTL zostaje przejęte.
+ */
+export const speechLockFile = path.join(stateDir, 'speaking.lock')
 
 /** Surowy payload ostatniego hooka. Schemat nie jest udokumentowany, więc zostaje do diagnostyki. */
 export const lastPayloadFile = path.join(stateDir, 'last-payload.json')

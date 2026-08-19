@@ -120,6 +120,32 @@ async function player(file: string, volume: number): Promise<[string, string[]]>
  * Nazwa jest losowa, bo restart głośności potrafi na moment nałożyć nowe odtwarzanie na stare,
  * zanim tamto padnie — dwa procesy nie mogą wtedy walczyć o ten sam plik.
  */
+/**
+ * Zagraj gotowy plik audio z dysku (krótki sygnał „ring").
+ *
+ * Osobno od `playAudio`, bo tu nie ma bufora z syntezy ani sprzątania po pliku tymczasowym —
+ * plik istnieje na stałe w katalogu rozszerzenia. Głośność liczona jak przy mowie: skalujemy
+ * wyłącznie ten dźwięk, systemu nie ruszamy.
+ */
+export async function playSoundFile(file: string, volume: number, signal: AbortSignal): Promise<void> {
+  if (process.platform === 'win32') {
+    const script = windowsScriptPath()
+    await run(
+      'powershell',
+      [
+        '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+        '-File', script,
+        '-File', file,
+        '-Volume', Math.max(0, Math.min(1, volume)).toFixed(3),
+      ],
+      signal,
+    )
+    return
+  }
+  const [command, args] = await player(file, volume)
+  await run(command, args, signal)
+}
+
 export async function playAudio(bytes: Buffer, volume: number, signal: AbortSignal): Promise<void> {
   fs.mkdirSync(stateDir, { recursive: true })
   const file = path.join(stateDir, `clip-${Date.now()}-${Math.random().toString(36).slice(2)}.mp3`)

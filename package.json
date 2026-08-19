@@ -2,7 +2,7 @@
   "name": "coding-voice",
   "displayName": "Coding Voice",
   "description": "Reads the agent's answer out loud when a prompt finishes. Play/pause in the status bar, your own TTS API key, multiple languages.",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "publisher": "larspunx",
   "license": "MIT",
   "icon": "assets/logo.png",
@@ -197,7 +197,7 @@
         "codingVoice.duckSystemAudio": {
           "type": "boolean",
           "default": false,
-          "description": "Quiet other apps while a summary is read, then restore them to their previous level. Windows: every other app (including a browser playing YouTube) is lowered per app. macOS: Apple Music and Spotify are lowered automatically — macOS has no public API to control a browser's volume, so YouTube in a browser is not affected there."
+          "description": "Quiet other apps while a summary is read, then restore them to their previous level. Windows: every other app (including a browser playing YouTube) is lowered per app. macOS: Music, TV, Spotify and Swinsian are lowered automatically — macOS has no public API to control a browser's volume, so a YouTube tab in Chrome/Safari is not affected there and keeps playing at its level."
         },
         "codingVoice.duckLevel": {
           "type": "number",
@@ -212,6 +212,11 @@
           "minimum": 0,
           "maximum": 5000,
           "description": "How long the volume fades down when reading starts and back up when it ends, in milliseconds. 0 makes it instant. Only used when 'Duck system audio' is on."
+        },
+        "codingVoice.ring": {
+          "type": "boolean",
+          "default": true,
+          "description": "Play a short ring when the agent finishes its turn and is waiting on you but has nothing to read aloud — e.g. it asked a question, proposed a plan, or only made edits. Helps you notice decision points that would otherwise be silent."
         }
       }
     },

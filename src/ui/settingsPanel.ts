@@ -37,6 +37,10 @@ const ELEVENLABS_VOICE_DESIGN = 'https://elevenlabs.io/app/voice-lab'
 /** Napiwek dla autora — działa dla każdego (karta/PayPal), Polak też wpłaci. */
 const KOFI_URL = 'https://ko-fi.com/larspunx'
 
+/** Dedykowany adres na opinie i sugestie — osobny od prywatnego, żeby nie wystawiać głównej skrzynki
+ *  w kodzie open-source (boty scrapują `mailto:`). Otwierany przez `openExternal`, z gotowym tematem. */
+const FEEDBACK_EMAIL = 'chuidaimosdemo@gmail.com'
+
 /**
  * Tekst testu głosowego — jednocześnie krótki samouczek i próbka brzmienia.
  *
@@ -137,6 +141,17 @@ export function createSettingsPanel(secrets: Secrets, controller: SpeechControll
         await vscode.env.openExternal(vscode.Uri.parse(ELEVENLABS_VOICE_DESIGN))
       } else if (type === 'kofi') {
         await vscode.env.openExternal(vscode.Uri.parse(KOFI_URL))
+      } else if (type === 'feedback') {
+        // `mailto:` z gotowym tematem i szablonem treści. Wszystko percent-encoded, bo temat/treść
+        // mają spacje i nowe linie — inaczej klient poczty ucina je na pierwszej spacji.
+        const subject = encodeURIComponent('Coding Voice — feedback')
+        const body = encodeURIComponent(
+          'A bug, an idea, or just hi — anything helps.\n\n' +
+            '(If it\'s a bug, your OS and Coding Voice version make it easier to track down.)\n',
+        )
+        await vscode.env.openExternal(
+          vscode.Uri.parse(`mailto:${FEEDBACK_EMAIL}?subject=${subject}&body=${body}`),
+        )
       }
     })
 
@@ -312,6 +327,15 @@ function html(): string {
     padding: 7px 16px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
   }
   .kofi:hover { background: #3dbcef; }
+  .feedback {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: transparent; color: var(--vscode-foreground);
+    border: 1px solid var(--vscode-button-border, rgba(128,128,128,0.4));
+    border-radius: 999px; padding: 7px 16px;
+    font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .feedback:hover { background: rgba(128,128,128,0.12); }
+  .footer .fb-note { margin: 0; font-size: 11px; opacity: 0.55; }
 </style>
 </head>
 <body>
@@ -391,9 +415,13 @@ function html(): string {
     <div class="group">Other apps</div>
 
     <div class="row">
-      <div class="label"><span class="name">Quiet other apps while reading</span><span class="desc">Lower music/video while a summary plays, then restore. Windows: any app (incl. a browser on YouTube). macOS: Apple Music &amp; Spotify.</span></div>
+      <div class="label"><span class="name">Quiet other apps while reading</span><span class="desc">Lower music/video while a summary plays, then restore it to the exact level it was.</span></div>
       <div class="control"><input type="checkbox" id="duckSystemAudio" /></div>
     </div>
+    <div class="hint"><b>Windows:</b> every app is lowered per app — including a browser playing YouTube.
+      <b>macOS:</b> Music, TV, Spotify and Swinsian are lowered automatically. A browser tab (YouTube
+      in Chrome/Safari) can't be — macOS has no public API to control a browser's volume, so that one
+      audio source keeps playing at its level.</div>
 
     <div class="slider-row duck">
       <div class="slider-top">
@@ -521,6 +549,13 @@ function html(): string {
       <div class="control"><input type="checkbox" id="announceProject" /></div>
     </div>
 
+    <div class="group">Notifications</div>
+
+    <div class="row">
+      <div class="label"><span class="name">Ring when the agent needs you</span><span class="desc">Play a short chime when a turn ends with nothing to read — a question, a plan, or just edits. Catches decision points that pass silently.</span></div>
+      <div class="control"><input type="checkbox" id="ring" /></div>
+    </div>
+
     <div class="group">Extension</div>
 
     <div class="row">
@@ -535,14 +570,15 @@ function html(): string {
 
     <div class="footer">
       <p class="note"><span class="who">Coding Voice by Lars.</span><br />
-        Enjoy the extension. I'd love you to hear my music — recorded analog, no AI.</p>
-      <p class="note">If this tool saves you some time, you can buy me a coffee — anything is
-        appreciated, and it keeps the project going :)</p>
-      <p class="note signoff">Cheers, Lars :)</p>
+        Enjoy the extension. Listen to my music.</p>
+      <p class="note">And if this tool saves you some time, you can buy me a coffee.</p>
+      <p class="note signoff">Cheers, Lars</p>
       <div class="buttons">
         <button id="music" class="spotify"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 12V4l7 1.6"/><circle cx="4.4" cy="12" r="1.6"/><circle cx="11.4" cy="10.6" r="1.6"/></svg>Listen on Spotify</button>
         <button id="kofi" class="kofi"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h8v3.5a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z"/><path d="M11 7h1.6a1.6 1.6 0 0 1 0 3.2H11"/><path d="M5 2.5v1.6M8 2.5v1.6"/></svg>Buy me a coffee</button>
+        <button id="feedback" class="feedback"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3.5" width="12" height="9" rx="1.5"/><path d="M2.5 4.5 8 8.5l5.5-4"/></svg>Send feedback</button>
       </div>
+      <p class="note fb-note">Feedback and ideas are always welcome — it's just me, and I read every one.</p>
     </div>
   </div>
 
@@ -555,6 +591,7 @@ function html(): string {
   $('enabled').addEventListener('change', (e) => set('enabled', e.target.checked));
   $('skipCodeBlocks').addEventListener('change', (e) => set('skipCodeBlocks', e.target.checked));
   $('announceProject').addEventListener('change', (e) => set('announceProject', e.target.checked));
+  $('ring').addEventListener('change', (e) => set('ring', e.target.checked));
   $('duckSystemAudio').addEventListener('change', (e) => set('duckSystemAudio', e.target.checked));
 
   // Ściszanie innych aplikacji: poziom w %, czas fade pokazujemy w sekundach, zapis po puszczeniu.
@@ -620,6 +657,7 @@ function html(): string {
   $('rawSettings').addEventListener('click', () => vscode.postMessage({ type: 'rawSettings' }));
   $('music').addEventListener('click', () => vscode.postMessage({ type: 'music' }));
   $('kofi').addEventListener('click', () => vscode.postMessage({ type: 'kofi' }));
+  $('feedback').addEventListener('click', () => vscode.postMessage({ type: 'feedback' }));
   $('voiceDesign').addEventListener('click', () => vscode.postMessage({ type: 'voiceDesign' }));
 
   const draggingVolume = () => document.activeElement === $('volume');
@@ -631,6 +669,7 @@ function html(): string {
     $('enabled').checked = s.enabled;
     $('skipCodeBlocks').checked = s.skipCodeBlocks;
     $('announceProject').checked = s.announceProject;
+    $('ring').checked = s.ring;
     $('duckSystemAudio').checked = s.duckSystemAudio;
     $('duckLevel').value = String(Math.round(s.duckLevel)); $('duckLevelNum').textContent = String(Math.round(s.duckLevel));
     $('duckFade').value = String(Math.round(s.duckFade)); $('duckFadeNum').textContent = (Math.round(s.duckFade) / 1000).toFixed(1);

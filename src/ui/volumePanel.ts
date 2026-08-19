@@ -157,6 +157,7 @@ function html(initial: number): string {
     cursor: grab;
   }
   .hint { font-size: 11px; opacity: 0.55; line-height: 1.5; }
+  .note { font-size: 10.5px; opacity: 0.4; line-height: 1.5; }
 </style>
 </head>
 <body>
@@ -173,6 +174,7 @@ function html(initial: number): string {
     </div>
     <div class="hint">Grab the dot and drag. Changes only this voice — your system volume stays
       where it is. While an answer is playing, the new level takes over the current sentence.</div>
+    <div class="note">If nothing is playing, the new level starts with the next answer.</div>
   </div>
 <script nonce="${n}">
   const vscode = acquireVsCodeApi();

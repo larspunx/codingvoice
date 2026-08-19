@@ -40,6 +40,9 @@ export interface Settings {
   duckLevel: number
   /** Czas płynnego przejścia głośności (fade) w obie strony, w milisekundach. 0 = skokowo. */
   duckFade: number
+  /** Zagraj krótki dźwięk, gdy agent kończy turę i czeka na Ciebie, ale nie ma nic do przeczytania
+   *  (pytanie przez narzędzie, plan, same edycje) — patrz `RING_SIGNAL` i hook `speak`. */
+  ring: boolean
 }
 
 const SECTION = 'codingVoice'
@@ -65,6 +68,7 @@ export function readSettings(): Settings {
     duckSystemAudio: config.get<boolean>('duckSystemAudio', false),
     duckLevel: config.get<number>('duckLevel', 40),
     duckFade: config.get<number>('duckFade', 600),
+    ring: config.get<boolean>('ring', true),
   }
 }
 

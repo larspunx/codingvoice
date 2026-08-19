@@ -11,9 +11,10 @@
  *             odtwarzaczem TTS do zadanego poziomu i przywracamy. Obejmuje też przeglądarkę grającą
  *             YouTube. Robi dokładnie to, o co chodzi — bez żadnej konfiguracji ani uprawnień.
  *   macOS   — brak publicznego API do głośności per aplikacja. Ściszamy więc automatycznie te
- *             odtwarzacze, które są skryptowalne i podają swój stan — Apple Music i Spotify — przez
- *             `sound volume`. Znamy ich `player state`, więc ruszamy tylko te, które REALNIE grają, i
- *             wracamy do dokładnego poziomu. Przeglądarki (YouTube) świadomie NIE ruszamy: jedyne lewary
+ *             skryptowalne playery z rodziny iTunes (Music, TV, Spotify, Swinsian), które podają swój
+ *             stan przez `sound volume` i `player state`. Ruszamy tylko te, które REALNIE grają, i
+ *             wracamy do dokładnego poziomu. Każdą apkę odpalamy OSOBNYM `osascript` (patrz MAC_APPS),
+ *             bo brak jednej nie może wywalić reszty. Przeglądarki (YouTube) świadomie NIE ruszamy: jedyne lewary
  *             to systemowy klawisz Play/Pause (wymaga uprawnienia Accessibility i jest ślepym togglem —
  *             mógłby WŁĄCZYĆ dźwięk) albo sterowanie kartą (wymaga per-user włączenia JS z Apple Events).
  *             Żadne nie działa „u każdego bez konfiguracji", więc dla wtyczki ze sklepu odpadają.
@@ -123,93 +124,124 @@ interface MacState {
 
 const MAC_STATE_FILE = path.join(stateDir, 'duck-mac.json')
 
-/** Odtwarzacze z jednolitym `sound volume` (0–100) i `player state` w AppleScript. Tylko takie ruszamy:
- *  znamy ich stan, więc nie ma ryzyka „ślepego" włączenia dźwięku, a przywracamy dokładny poziom. */
-const MAC_APPS = ['Spotify', 'Music']
+/**
+ * Odtwarzacze z jednolitym `sound volume` (0–100) i `player state` w AppleScript — słownictwo rodziny
+ * iTunes. Tylko takie ruszamy: znamy ich stan, więc nie ma ryzyka „ślepego" włączenia dźwięku, a
+ * przywracamy dokładny poziom.
+ *
+ * AppleScriptem ruszamy WYŁĄCZNIE apki, które realnie działają — filtr `pgrep` w `macRunningApps`
+ * (bez Apple Events, bez uprawnień, bez okien) odsiewa nieobecne, ZANIM padnie jakikolwiek `tell`.
+ * To zamyka drogę do dialogu „Gdzie jest X?" (macOS pokazuje go, gdy AppleScript adresuje apkę, której
+ * nie ma) i naprawia ukryte ryzyko dla Spotify u kogoś, kto go nie ma. KAŻDA działająca apka idzie potem
+ * OSOBNYM `osascript` — równolegle (patrz MacBackend), więc czas to najdłuższa rampa, nie suma; osobne
+ * procesy izolują też ewentualny błąd jednej apki od reszty. Podcasts NIE pasuje (brak `sound volume`/
+ * `player state` w słowniku), więc nawet uruchomiony zostałby pominięty przez `try` w skrypcie.
+ */
+const MAC_APPS = ['Spotify', 'Music', 'TV', 'Swinsian']
 
 /**
- * Ramp `sound volume` od bieżącego poziomu do celu w `steps` krokach po `delaySec`. Na końcu dobija
- * do dokładnej wartości, żeby zaokrąglenia nie zostawiły np. 9.7 zamiast 10.
- *
- * `relative` rozstrzyga, czym jest `to`:
- *   duck    (`relative=true`)  — `to` to PROCENT bieżącej głośności aplikacji; cel liczymy z jej
- *                                `startVol` (np. grało 60, `to=50` → cel 30). Tak użytkownik myśli o
- *                                ściszaniu: „przygłoś o połowę", niezależnie od tego, jak głośno grało.
- *   restore (`relative=false`) — `to` to wartość BEZWZGLĘDNA zapamiętana sprzed ściszenia; wracamy 1:1.
+ * Skrypt ściszający JEDNĄ aplikację. Wchodzimy do `tell` tylko gdy działa (`is running` nie uruchamia
+ * apki) i ściszamy jedynie, gdy REALNIE gra (`player state is playing`), żeby nie ruszać wyciszonej w
+ * tle muzyki. Ramp od `startVol` do celu w `steps` krokach po `delaySec`, na końcu dobicie do celu
+ * (zaokrąglenia nie zostawią np. 9.7 zamiast 10). `level` to PROCENT bieżącej głośności — cel liczymy
+ * z `startVol` (grało 60, level=50 → cel 30); tak użytkownik myśli o ściszaniu: „przygłoś o połowę".
+ * Zwraca `APP=startVol`, gdy realnie grała (do zapamiętania), inaczej pusto.
  */
-function macRampBlock(
-  app: string,
-  to: number,
-  steps: number,
-  delaySec: string,
-  guardPlaying: boolean,
-  relative: boolean,
-): string {
-  const guardOpen = guardPlaying ? '\n      if player state is playing then' : ''
-  const guardClose = guardPlaying ? '\n      end if' : ''
-  const capture = guardPlaying ? `\n        set out to out & "${app}=" & (startVol as text) & linefeed` : ''
-  const targetExpr = relative ? `startVol * ${to} / 100` : `${to}`
-  return `
-if application "${app}" is running then
+function macDuckOne(app: string, level: number, steps: number, delaySec: string): string {
+  return `if application "${app}" is running then
   tell application "${app}"
-    try${guardOpen}
-        set startVol to sound volume${capture}
-        set target to ${targetExpr}
+    try
+      if player state is playing then
+        set startVol to sound volume
+        set target to startVol * ${level} / 100
         repeat with i from 1 to ${steps}
           set sound volume to (startVol + (target - startVol) * i / ${steps})
           delay ${delaySec}
         end repeat
-        set sound volume to target${guardClose}
+        set sound volume to target
+        return "${app}=" & (startVol as text)
+      end if
     end try
   end tell
-end if`
+end if
+return ""`
 }
 
-function macDuckScript(level: number, steps: number, delaySec: string): string {
-  // `application "X" is running` NIE uruchamia aplikacji (to statyczna właściwość). Do bloku `tell`
-  // wchodzimy tylko, gdy działa. Ściszamy jedynie te, które REALNIE grają (`player state is playing`),
-  // żeby nie ruszać wyciszonej w tle muzyki, i zapamiętujemy ich poziom sprzed rampy. `level` to procent
-  // bieżącej głośności, więc cel liczy się per aplikacja z jej własnego `startVol`.
-  const parts = MAC_APPS.map((app) => macRampBlock(app, level, steps, delaySec, true, true)).join('')
-  return `set out to ""${parts}
-return out`
+/** Przywrócenie JEDNEJ aplikacji do zapamiętanego poziomu (wartość BEZWZGLĘDNA sprzed ściszenia), rampą. */
+function macRestoreOne(app: string, vol: number, steps: number, delaySec: string): string {
+  return `if application "${app}" is running then
+  tell application "${app}"
+    try
+      set startVol to sound volume
+      set target to ${Math.round(vol)}
+      repeat with i from 1 to ${steps}
+        set sound volume to (startVol + (target - startVol) * i / ${steps})
+        delay ${delaySec}
+      end repeat
+      set sound volume to target
+    end try
+  end tell
+end if
+return ""`
 }
 
-function macRestoreScript(apps: Record<string, number>, steps: number, delaySec: string): string {
-  const parts = Object.entries(apps)
-    .map(([app, vol]) => macRampBlock(app, Math.round(vol), steps, delaySec, false, false))
-    .join('')
-  return parts || 'return'
+/** Przywrócenie JEDNEJ aplikacji skokowo (recover po crashu — bez rampy). */
+function macRestoreInstantOne(app: string, vol: number): string {
+  return `if application "${app}" is running then tell application "${app}" to set sound volume to ${Math.round(vol)}`
 }
 
-function macRestoreInstant(apps: Record<string, number>): string {
-  const parts = Object.entries(apps)
-    .map(
-      ([app, vol]) =>
-        `if application "${app}" is running then tell application "${app}" to set sound volume to ${Math.round(vol)}`,
-    )
-    .join('\n')
-  return parts || 'return'
+/**
+ * Które z MAC_APPS naprawdę DZIAŁAJĄ — sprawdzane przez `pgrep`, BEZ AppleScriptu.
+ *
+ * To jest bramka bezpieczeństwa przeciw dialogowi „Wybierz aplikację / Gdzie jest X?": gdy AppleScript
+ * adresuje apkę, której nie ma, macOS (CoreServicesUIAgent) potrafi wyświetlić okno lokalizacji i zawiesić
+ * czekanie. `pgrep` to zwykły odczyt tablicy procesów — nie wysyła Apple Events, więc NIE prosi o
+ * uprawnienie Automation ani nie pokazuje żadnego okna. AppleScript odpalamy potem WYŁĄCZNIE dla apek z
+ * tej listy — a skoro działają, to są zainstalowane, więc `tell` się kompiluje i żaden dialog nie padnie.
+ * Naprawia to też ukryte ryzyko dla Spotify u kogoś, kto go nie ma. `-x` = dokładne dopasowanie nazwy
+ * procesu (= nazwa aplikacji dla naszej listy). Kod 1 z pgrep znaczy „nic nie pasuje" → pusty zbiór.
+ */
+async function macRunningApps(): Promise<Set<string>> {
+  const pattern = MAC_APPS.map((a) => a.replace(/[^A-Za-z0-9]/g, '')).join('|')
+  try {
+    const out = await exec('/usr/bin/pgrep', ['-x', '-l', pattern], undefined, 3000)
+    const running = new Set<string>()
+    for (const line of out.split('\n')) {
+      const name = line.trim().split(/\s+/)[1]
+      if (name && MAC_APPS.includes(name)) running.add(name)
+    }
+    return running
+  } catch {
+    return new Set() // pgrep kończy kodem 1, gdy nic nie gra — traktujemy jak „nie ma czego ściszać"
+  }
 }
 
 class MacBackend implements DuckBackend {
   async duck(level: number, fadeMs: number): Promise<void> {
+    // NAJPIERW bramka `pgrep`: AppleScriptem ruszamy tylko apki, które REALNIE działają. Dzięki temu
+    // nigdy nie adresujemy apki nieobecnej — a to jedyna droga do dialogu „Gdzie jest X?" (patrz
+    // macRunningApps). Gdy nic nie gra, nie ma czego ściszać — zostawiamy pusty stan.
+    const running = await macRunningApps()
+    const targets = MAC_APPS.filter((app) => running.has(app))
     const { steps, delaySec } = fadeSteps(fadeMs)
-    const out = await exec(
-      OSASCRIPT,
-      ['-e', macDuckScript(level, steps, delaySec)],
-      undefined,
-      fadeMs + 5000,
+    // Każda działająca apka osobnym procesem, RÓWNOLEGLE: nie grająca (lub tylko wyciszona) zwraca pusto
+    // i jest pomijana. Czas całości ~ najdłuższa rampa, nie suma. `tell` się kompiluje, bo apka działa.
+    const results = await Promise.all(
+      targets.map((app) =>
+        exec(OSASCRIPT, ['-e', macDuckOne(app, level, steps, delaySec)], undefined, fadeMs + 5000).catch(
+          () => '',
+        ),
+      ),
     )
-    log(`mac duck level=${level} fade=${fadeMs} → ${JSON.stringify(out.trim())}`)
     const apps: Record<string, number> = {}
-    for (const line of out.split('\n')) {
-      const [app, value] = line.trim().split('=')
+    for (const out of results) {
+      const [app, value] = out.trim().split('=')
       if (app && value !== undefined && value !== '') {
         const n = Number.parseFloat(value)
         if (Number.isFinite(n)) apps[app] = n
       }
     }
+    log(`mac duck level=${level} fade=${fadeMs} → ${JSON.stringify(apps)}`)
     try {
       fs.writeFileSync(MAC_STATE_FILE, JSON.stringify({ apps } satisfies MacState), 'utf8')
     } catch {
@@ -220,15 +252,20 @@ class MacBackend implements DuckBackend {
   async restore(fadeMs: number): Promise<void> {
     const state = readMacState()
     if (!state) return
-    if (Object.keys(state.apps).length > 0) {
+    const entries = Object.entries(state.apps)
+    if (entries.length > 0) {
       const { steps, delaySec } = fadeSteps(fadeMs)
       log(`mac restore fade=${fadeMs} → ${JSON.stringify(state.apps)}`)
-      await exec(
-        OSASCRIPT,
-        ['-e', macRestoreScript(state.apps, steps, delaySec)],
-        undefined,
-        fadeMs + 5000,
-      ).catch((e) => log(`mac restore FAIL ${String(e)}`))
+      await Promise.all(
+        entries.map(([app, vol]) =>
+          exec(OSASCRIPT, ['-e', macRestoreOne(app, vol, steps, delaySec)], undefined, fadeMs + 5000).catch(
+            (e) => {
+              log(`mac restore ${app} FAIL ${String(e)}`)
+              return ''
+            },
+          ),
+        ),
+      )
     }
     clearMacState()
   }
@@ -236,8 +273,13 @@ class MacBackend implements DuckBackend {
   async recover(): Promise<void> {
     const state = readMacState()
     if (!state) return
-    if (Object.keys(state.apps).length > 0) {
-      await exec(OSASCRIPT, ['-e', macRestoreInstant(state.apps)]).catch(() => undefined)
+    const entries = Object.entries(state.apps)
+    if (entries.length > 0) {
+      await Promise.all(
+        entries.map(([app, vol]) =>
+          exec(OSASCRIPT, ['-e', macRestoreInstantOne(app, vol)]).catch(() => ''),
+        ),
+      )
     }
     clearMacState()
   }
